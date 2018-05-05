@@ -1,0 +1,3 @@
+nsynth-valid.tfrecord
+nsynth-test.tfrecord
+nsynth-train.tfrecord
