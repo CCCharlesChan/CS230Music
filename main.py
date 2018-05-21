@@ -17,6 +17,8 @@ logging = tf.logging
 pp = pprint.PrettyPrinter()
 
 flags.DEFINE_integer("num_epoch", 1, "epoch or iterations to run training.")
+flags.DEFINE_integer("num_hidden_units", 10, 
+                     "number of hidden units in each layer.")
 flags.DEFINE_string("input_data_dir", None, "path to training/test data.")
 flags.DEFINE_boolean("is_train", False, "True for training, False for testing.")
 
@@ -38,9 +40,16 @@ def main(_):
   index2chord = np.load(
       os.path.join(FLAGS.input_data_dir, "index2chord.npy"))
   song_num = np.load(os.path.join(FLAGS.input_data_dir, "song_num.npy"))
+  song_lengths = np.load(
+      os.path.join(FLAGS.input_data_dir, "song_lengths.npy"))
 
   with tf.Session(config=tf.ConfigProto()) as sess:
-    rnn_gan = RnnGan(sess, training_data=chroma, labels=chord)
+    rnn_gan = RnnGan(
+        sess,
+        training_data=chroma,
+        labels=chord,
+        sequence_lengths=song_lengths,
+        flags=FLAGS)
 
   if FLAGS.is_train():
     print("============= TRAINING =============")

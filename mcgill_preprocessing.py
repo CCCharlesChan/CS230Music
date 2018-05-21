@@ -127,18 +127,16 @@ def mcgill_preprocess(sample_range=1301,
   return chroma, chord, dict_chord2idx, dict_idx2chord, song_num
 
 
-def preprocess_data_and_store(verbose=False):
+def preprocess_data_and_store(input_dir, output_dir, verbose=False):
   """Preprocess & store the McGill data once and for all.
 
-  Note: you must modify working_dir and output_dir **in the code**.
-
   Args:
+    intput_dir: full path to where McGill_Billboard dataset is.
+    output_dir: where to store the output. Must already exist.
     verbose: Boolean, if True, will print progress to stdout.
 
   TODO(elizachu): stop hard-coding the directory paths. Use optparse.
   """
-  # working_dir should be full path to where McGill_Billboard dataset is.
-  working_dir = "/Users/Eli/Documents/Stanford/cs230/Project/McGill_Billboard"
 
   # TODO(elizachu): open a file and write periodically in this function, instead
   # of waiting for all songs to be processed then saving them. If program is
@@ -147,10 +145,6 @@ def preprocess_data_and_store(verbose=False):
       working_dir=working_dir,
       output_list=False,
       print_progress=verbose)
-
-  # output_dir needs to already exist; full path to directory to save .npy
-  # output files.
-  output_dir = "/Users/Eli/Documents/Stanford/cs230/Project/preprocessed_mcgill2"
 
   chroma_filename = os.path.join(output_dir, "chroma")
   chord_filename = os.path.join(output_dir, "chord")
@@ -166,10 +160,49 @@ def preprocess_data_and_store(verbose=False):
 
   if verbose:
     print("Saved all numpy outputs to: %s." % output_dir)
+    print("chroma.shape:", chroma.shape)
+    print("chroma[0].shape:", chroma[0].shape)
+    print("chord.shape:", chord.shape)
+    print("chord[0].shape:", chord[0].shape)
+    print("index2chord[0]:", index2chord[0])
+  
 
+def extract_song_lengths(input_dir, output_dir):
+  """Given a chroma output where output_list=True, save a song_lengths.npy.
+   
+  Args:
+    input_dir: directory where .npy files were stored, when it was processed
+      with output_list = True.
+    output_dir: string, where to save the song_lengths.npy output.
+      song_lengths.npy is a numpy array of each song's length in number of
+      frames.
+  """
+  print("Extracting song lengths...")
+
+  # chroma_output_dir is 
+  chroma = np.load(os.path.join(chroma_output_dir, "chroma.npy"))
+
+  song_lengths = [chroma[i].shape[0] for i in xrange(chroma.shape[0])]
+  print(song_lengths[0:10])
+  np.save(os.path.join(output_dir, "song_lengths.npy"), song_lengths)
+  print("Saved to song_lengths.npy")
 
 def main(unused_argv=None):
-  preprocess_data_and_store(verbose=True)
+
+  # working_dir should be full path to where McGill_Billboard dataset is.
+  working_dir = "/Users/elizachu/Desktop/McGill_Billboard"
+
+  # output_dir needs to already exist; full path to directory to save .npy
+  # output files.
+  output_dir = "/Users/elizachu/Desktop/mcgill_zero_pad"
+
+  # This should be output_dir of when we ran preprocess_data... with
+  # output_list = True.
+  list_input_dir = "/Users/elizachu/Desktop/preprocessed_mcgill"
+
+  preprocess_data_and_store(
+      input_dir=working_dir, output_dir=output_dir, verbose=True)
+  extract_song_lengths(input_dir=list_input_dir, output_dir=output_dir)
 
 
 if __name__ == "__main__":

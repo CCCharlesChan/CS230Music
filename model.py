@@ -6,16 +6,20 @@ import tensorflow as tf
 class RnnGan(object):
   """Generative Adversarial Net implemented with RNNs."""
 
-  def __init__(self, sess, training_data, labels):
+  def __init__(self, sess, training_data, labels, sequence_lengths, flags):
     """
     Args:
       sess: tf.Session.
       training_data: np.array or array_like, input training data (X).
       labels: np.array or array_like, true labels of data (Y).
+      sequence_lengths: np.array, length of each song in number of frames.
+      flags: tf.flags, commandline flags passed in by the user.
     """
     self.sess = sess
     self.data = training_data
     self.labels = labels
+    self.sequence_lengths = sequence_lengths
+    self.flags = flags
 
     # Initialize generator & discriminator.
     self.d_real, self.d_logit_real = self.discriminator(self.data)
@@ -47,7 +51,7 @@ class RnnGan(object):
     tf.global_variables_initializer().run()
 
     for epoch in xrange(config.num_epoch):
-      self.sess.run([d_optimizer, d_loss],
+      self.sess.run([d_optimizer, self.d_loss],
                     feed_dict={X: self.data, Y: self.labels})
        
 
@@ -57,24 +61,37 @@ class RnnGan(object):
 
   def discriminator(self, input_data, true_labels=None):
     """Discriminator takes data and outputs probability the data is real."""
-    # Create placeholdrs & initialize parameters.
-    X = tf.placeholder(tf.float32, shape=(None, 15122, 25), name="X")
-    with tf.variable_scope("discriminator") as scope:
-      d_W1 = tf.get_variable("d_W1", shape=(100, 100),
-          initializer=tf.contrib.layers.xavier_initializer())
-      d_b1 = tf.get_variable("d_b1", shape=(1, 100),
-          initializer=tf.zeros_initializer())
-      d_W2 = tf.get_variable("d_W2", shape=(100, 25),
-          initializer=tf.contrib.layers.xavier_initializer())
-      d_b2 = tf.get_variable("d_b2", shape=(1, 25),
-          initializer=tf.zeros_initializer())
 
-    # TODO(elizachu): Forward prop with tf.contrib.rnn.BasicLSTMCell or 
-    # tf.contrib.rnn.MultiRNNCell or tf.nn.static_rnn() to compute prediction.
+    # Input data X of shape [m, frame, chroma vector]. Zero-padded.
+    X = tf.placeholder(tf.float32, shape=(None, 15122, 25))
 
-    prediction = 0.5
-    d_theta = [d_W1, d_b1, d_W2, d_b2]
-    return (prediction, d_theta)
+    # 2-layer LSTM, each layer has num_hidden_units hidden units.
+    rnn_cell = tf.contrib.rnn.MultiRNNCell([
+        tf.contrib.rnn.BasicLSTMCell(self.flags.num_hidden_units),
+        tf.contrib.rnn.BasicLSTMCell(self.flags.num_hidden_units),
+    ])
+
+    # Define initial state.
+    initial_state = rnn_cell.zero_state(batch_size=15122, dtype=tf.float32)
+
+    outputs, state = tf.nn.dynamic_rnn(
+        cell=rnn_cell,
+        dtype=tf.float32,
+        sequence_length=self.sequence_lengths,
+        inputs=X)
+
+    # Only care about output activation at last layer.
+    print("outputs.shape:", outputs.shape)
+    outputs = tf.transpose(outputs, [1, 0, 2])
+    last = tf.gather(outputs, int(outputs.get_shape()[0]) - 1)
+
+    # Add softmax classifier.
+    out_size = 38  # Number of chords according to index2chord.
+    logit = tf.contrib.layers.fully_connected(
+        last, out_size, activation_fn=None)
+    prediction = tf.nn.softmax(logit)
+
+    return prediction
 
   def load(self, checkpoint_dir):
     pass
