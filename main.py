@@ -36,12 +36,20 @@ def main(_):
   chroma = np.load(os.path.join(FLAGS.input_data_dir, "chroma.npy"))
   chord = np.load(os.path.join(FLAGS.input_data_dir, "chord.npy"))
   chord2index = np.load(
-      os.path.join(FLAGS.input_data_dir, "chord2index.npy"))
+      os.path.join(FLAGS.input_data_dir, "chord2index.npy")).item()
   index2chord = np.load(
-      os.path.join(FLAGS.input_data_dir, "index2chord.npy"))
-  song_num = np.load(os.path.join(FLAGS.input_data_dir, "song_num.npy"))
+      os.path.join(FLAGS.input_data_dir, "index2chord.npy")).item()
+  song_num = np.load(
+      os.path.join(FLAGS.input_data_dir, "song_num.npy")).tolist()
   song_lengths = np.load(
       os.path.join(FLAGS.input_data_dir, "song_lengths.npy"))
+
+  print("chroma.shape:", chroma.shape)
+  print("chord.shape:", chord.shape)
+  print("len(chord2index.keys()):", len(chord2index.keys()))
+  print("len(index2chord.keys()):", len(index2chord.keys()))
+  print("len(song_num):", len(song_num))
+  print("song_lengths.shape:", song_lengths.shape)
 
   with tf.Session(config=tf.ConfigProto()) as sess:
     rnn_gan = RnnGan(

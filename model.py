@@ -60,7 +60,12 @@ class RnnGan(object):
     return np.random.uniform(-1., 1., size=[100,100])
 
   def discriminator(self, input_data, true_labels=None):
-    """Discriminator takes data and outputs probability the data is real."""
+    """Discriminator takes data and outputs K+1 probability vector.
+    
+    K is number of output labels (in our chord estimation task, 38?).
+    +1 node to indicate whether D thinks the data is real or not.
+    So total output = K+1 nodes.
+    """
 
     # Input data X of shape [m, frame, chroma vector]. Zero-padded.
     X = tf.placeholder(tf.float32, shape=(None, 15122, 25))
@@ -77,6 +82,9 @@ class RnnGan(object):
     outputs, state = tf.nn.dynamic_rnn(
         cell=rnn_cell,
         dtype=tf.float32,
+        # sequence_length indicates where to stop in a single training example.
+        # Since we zero-pad inputs, we should stop early based on actual song
+        # length to save computation cost.
         sequence_length=self.sequence_lengths,
         inputs=X)
 

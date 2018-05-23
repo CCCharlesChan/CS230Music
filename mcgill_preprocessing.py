@@ -49,6 +49,30 @@ def mcgill_preprocess(sample_range=1301,
   dict_chord2idx = dict()
   dict_idx2chord = dict()
   idx_chord = 0
+
+  # The note A# is equivalent to Bb, etc. 
+  #
+  # The McGill dataset seems to contain quite a few of these overlaps. Without
+  # removing these overlaps, we will have 38 chord labels when it should be 25 =
+  # maj/min of each of the 12 notes plus one N denoting "no chord."
+  # 
+  # There's also label 'X', denoting chords outside of the 24 maj/min, which for 
+  # the sake of simplicity we simply map to "N" = no chord.
+  repeated_chords = {
+      "A#:maj" : "Bb:maj",
+      "Cb:maj" : "B:maj",
+      "Cb:min" : "B:min",
+      "C#:maj" : "Db:maj",
+      "C#:min" : "Db:min",
+      "D#:maj" : "Eb:maj",
+      "D#:min" : "Eb:min",
+      "Fb:maj" : "E:maj",
+      "F#:maj" : "Gb:maj",
+      "F#:min" : "Gb:min",
+      "G#:maj" : "Ab:maj",
+      "G#:min" : "Ab:min",
+      "X" : "N",
+  }
   
   song_num = []
   if output_list:
@@ -78,9 +102,13 @@ def mcgill_preprocess(sample_range=1301,
         header=None)
     
     for i in range(chord_dat.shape[0]):
-      if chord_dat[2][i] not in dict_chord2idx:
-        dict_chord2idx.update({chord_dat[2][i]: idx_chord})
-        dict_idx2chord.update({idx_chord: chord_dat[2][i]})
+      chord_label_str = chord_dat[2][i]
+      # Remove repeated chords. C# = Db, G# = Ab etc.
+      if chord_label_str in repeated_chords:
+        chord_label_str = repeated_chords[chord_label_str]
+      if chord_label_str not in dict_chord2idx:
+        dict_chord2idx.update({chord_label_str: idx_chord})
+        dict_idx2chord.update({idx_chord: chord_label_str})
         idx_chord +=1
       
     chord_label = np.zeros((chroma_dat.shape[0], 2))
@@ -88,7 +116,11 @@ def mcgill_preprocess(sample_range=1301,
       sel_time = np.logical_and(
           chroma_dat[1] >= chord_dat[0][i],
           chroma_dat[1] < chord_dat[1][i])
-      chord_label[sel_time, 1] = dict_chord2idx[chord_dat[2][i]]
+      chord_label_str = chord_dat[2][i]
+      # Remove repeated chords.
+      if chord_label_str in repeated_chords:
+        chord_label_str = repeated_chords[chord_label_str]
+      chord_label[sel_time, 1] = dict_chord2idx[chord_label_str]
       chord_label[:,0] = chroma_dat[1]
       
     chroma_ready = chroma_dat.as_matrix()
@@ -127,12 +159,15 @@ def mcgill_preprocess(sample_range=1301,
   return chroma, chord, dict_chord2idx, dict_idx2chord, song_num
 
 
-def preprocess_data_and_store(input_dir, output_dir, verbose=False):
+def preprocess_data_and_store(
+    input_dir, output_dir, output_list=True, verbose=False):
   """Preprocess & store the McGill data once and for all.
 
   Args:
     intput_dir: full path to where McGill_Billboard dataset is.
     output_dir: where to store the output. Must already exist.
+    output_list: see mcgill_preprocess(), store output as Python list or 
+        numpy array.
     verbose: Boolean, if True, will print progress to stdout.
 
   TODO(elizachu): stop hard-coding the directory paths. Use optparse.
@@ -142,8 +177,8 @@ def preprocess_data_and_store(input_dir, output_dir, verbose=False):
   # of waiting for all songs to be processed then saving them. If program is
   # interrupted, we risk saving corrupted data.
   chroma, chord, chord2index, index2chord, song_num = mcgill_preprocess(
-      working_dir=working_dir,
-      output_list=False,
+      working_dir=input_dir,
+      output_list=output_list,
       print_progress=verbose)
 
   chroma_filename = os.path.join(output_dir, "chroma")
@@ -160,10 +195,14 @@ def preprocess_data_and_store(input_dir, output_dir, verbose=False):
 
   if verbose:
     print("Saved all numpy outputs to: %s." % output_dir)
-    print("chroma.shape:", chroma.shape)
-    print("chroma[0].shape:", chroma[0].shape)
-    print("chord.shape:", chord.shape)
-    print("chord[0].shape:", chord[0].shape)
+    if output_list:
+      print("len(chroma):", len(chroma))
+      print("len(chord):", len(chord))
+    else:
+      print("chroma.shape:", chroma.shape)
+      print("chroma[0].shape:", chroma[0].shape)
+      print("chord.shape:", chord.shape)
+      print("chord[0].shape:", chord[0].shape)
     print("index2chord[0]:", index2chord[0])
   
 
@@ -179,30 +218,45 @@ def extract_song_lengths(input_dir, output_dir):
   """
   print("Extracting song lengths...")
 
-  # chroma_output_dir is 
-  chroma = np.load(os.path.join(chroma_output_dir, "chroma.npy"))
+  chroma = np.load(os.path.join(input_dir, "chroma.npy"))
 
-  song_lengths = [chroma[i].shape[0] for i in xrange(chroma.shape[0])]
-  print(song_lengths[0:10])
-  np.save(os.path.join(output_dir, "song_lengths.npy"), song_lengths)
+  # chroma stores python List of length m, m = number of songs.
+  # Each item in List is a matrix of shape (num_frames, 25) for 25 chords.
+  # song_lengths[i] returns the number of frames in song i.
+  song_lengths = [chroma_data_matrix.shape[0] for chroma_data_matrix in chroma]
+
+  print("song_lengths[0:10]:", song_lengths[0:10])
+  np.save(os.path.join(output_dir, "song_lengths.npy"), np.array(song_lengths))
+
   print("Saved to song_lengths.npy")
 
 def main(unused_argv=None):
 
+  ############################# MODIFY FLAGS HERE ############################
+
   # working_dir should be full path to where McGill_Billboard dataset is.
-  working_dir = "/Users/elizachu/Desktop/McGill_Billboard"
+  working_dir = ("/Users/Eli/Documents/Stanford/cs230/project/data/"
+                 "McGill_Billboard")
 
   # output_dir needs to already exist; full path to directory to save .npy
   # output files.
-  output_dir = "/Users/elizachu/Desktop/mcgill_zero_pad"
+  output_dir = ("/Users/Eli/Documents/Stanford/cs230/project/data/"
+                "preprocessed_mcgill_list")
 
-  # This should be output_dir of when we ran preprocess_data... with
-  # output_list = True.
-  list_input_dir = "/Users/elizachu/Desktop/preprocessed_mcgill"
+  # See def mcgill_preprocess. Whether to store output data in Python List or
+  # zero-pad with numpy arrays.
+  output_list = True
+
+  ############################### END FLAGS ##################################
 
   preprocess_data_and_store(
-      input_dir=working_dir, output_dir=output_dir, verbose=True)
-  extract_song_lengths(input_dir=list_input_dir, output_dir=output_dir)
+      input_dir=working_dir,
+      output_dir=output_dir,
+      output_list=output_list,
+      verbose=True,
+  )
+
+  extract_song_lengths(input_dir=output_dir, output_dir=output_dir)
 
 
 if __name__ == "__main__":
