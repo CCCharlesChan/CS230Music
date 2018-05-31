@@ -1,4 +1,8 @@
-import os.path
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
+import os
 import time
 import numpy as np
 import tensorflow as tf
@@ -20,6 +24,13 @@ class RnnGan(object):
     self.labels = labels
     self.sequence_lengths = sequence_lengths
     self.flags = flags
+    self.tensorboard_log_dir = flags.tensorboard_log_dir
+
+    # Initialize tensorboard filewriter (saves summary data for visualization).
+    if not self.tensorboard_log_dir:
+      self.tensorboard_log_dir = os.getcwd()
+    writer = tf.summary.FileWriter(self.tensorboard_log_dir)
+    writer.add_graph(sess.graph)
 
     # Initialize generator & discriminator.
     self.d_real, self.d_logit_real = self.discriminator(self.data)
@@ -62,25 +73,40 @@ class RnnGan(object):
   def discriminator(self, input_data, true_labels=None):
     """Discriminator takes data and outputs K+1 probability vector.
     
-    K is number of output labels (in our chord estimation task, 38?).
+    K is number of output labels (in our chord estimation task, 25).
     +1 node to indicate whether D thinks the data is real or not.
-    So total output = K+1 nodes.
+    So total output = K+1 = 26 nodes.
     """
 
     # Input data X of shape [m, frame, chroma vector]. Zero-padded.
-    X = tf.placeholder(tf.float32, shape=(None, 15122, 25))
+    # Output should be [m, frame, prediction] where prediction is a vector
+    # of size 26 (25 chord classes + extra bit for real or generated data).
+    X = tf.placeholder(tf.float32, shape=(890, 15122, 25))
+    Y = tf.placeholder(tf.float32, shape=(890, 15122, 26))
 
-    # 2-layer LSTM, each layer has num_hidden_units hidden units.
-    rnn_cell = tf.contrib.rnn.MultiRNNCell([
-        tf.contrib.rnn.BasicLSTMCell(self.flags.num_hidden_units),
-        tf.contrib.rnn.BasicLSTMCell(self.flags.num_hidden_units),
-    ])
+    # Use named scopes for better tensorboard visualization.
+    with tf.name_scope("discriminator_lstm_fw"):
+        # 2-layer LSTM, each cell has num_hidden_units hidden units.
+        rnn_cell_fw = tf.contrib.rnn.MultiRNNCell([
+            tf.contrib.rnn.BasicLSTMCell(self.flags.num_hidden_units),
+            tf.contrib.rnn.BasicLSTMCell(self.flags.num_hidden_units),
+        ])
 
-    # Define initial state.
-    initial_state = rnn_cell.zero_state(batch_size=15122, dtype=tf.float32)
-
-    outputs, state = tf.nn.dynamic_rnn(
-        cell=rnn_cell,
+    with tf.name_scope("discriminator_lstm_bw"):
+        # backwards LSTM. We want bi-directional for chord estimation.
+        rnn_cell_bw = tf.contrib.rnn.MultiRNNCell([
+            tf.contrib.rnn.BasicLSTMCell(self.flags.num_hidden_units),
+            tf.contrib.rnn.BasicLSTMCell(self.flags.num_hidden_units),
+        ])
+    
+    # TODO: implement initial state of LSTM.
+    # TODO: dropout, minibatch...
+    
+    # Input shape is (batch_size, n_time_steps, n_input), 
+    # Output shape is (batch_size, n_time_steps, n_output).
+    (output_fw, output_bw), state = tf.nn.bidirectional_dynamic_rnn(
+        cell_fw=rnn_cell_fw,
+        cell_bw=rnn_cell_bw,
         dtype=tf.float32,
         # sequence_length indicates where to stop in a single training example.
         # Since we zero-pad inputs, we should stop early based on actual song
@@ -88,15 +114,17 @@ class RnnGan(object):
         sequence_length=self.sequence_lengths,
         inputs=X)
 
-    # Only care about output activation at last layer.
-    print("outputs.shape:", outputs.shape)
-    outputs = tf.transpose(outputs, [1, 0, 2])
-    last = tf.gather(outputs, int(outputs.get_shape()[0]) - 1)
+    print("output_fw.shape:", output_fw.shape)
+    print("output_bw.shape:", output_bw.shape)
+
+    # Concatenate forward and backward outputs.
+    outputs = tf.concat([output_fw, output_bw], axis=2)
+    print("concatenated outputs.shape:", outputs.shape)
 
     # Add softmax classifier.
-    out_size = 38  # Number of chords according to index2chord.
+    out_size = 26
     logit = tf.contrib.layers.fully_connected(
-        last, out_size, activation_fn=None)
+        outputs, out_size, activation_fn=None)
     prediction = tf.nn.softmax(logit)
 
     return prediction

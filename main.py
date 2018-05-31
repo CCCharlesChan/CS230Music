@@ -20,6 +20,9 @@ flags.DEFINE_integer("num_epoch", 1, "epoch or iterations to run training.")
 flags.DEFINE_integer("num_hidden_units", 10, 
                      "number of hidden units in each layer.")
 flags.DEFINE_string("input_data_dir", None, "path to training/test data.")
+flags.DEFINE_string(
+    "tensorboard_log_dir", None, 
+    "path to save tensorboard log data, defaults to current working dir.")
 flags.DEFINE_boolean("is_train", False, "True for training, False for testing.")
 
 FLAGS = flags.FLAGS
