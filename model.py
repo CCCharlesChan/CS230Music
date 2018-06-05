@@ -95,9 +95,9 @@ class RnnGan(object):
 
     for epoch in xrange(config.num_epoch):
       # TODO: make this work with generator.
-      #_, loss_val = self.sess.run([d_optimizer, self.d_loss],
-      #    feed_dict={self.X_placeholder: self.chroma})
-      #print("epoch %d: self.d_loss = %f" % (epoch, loss_val))
+      _, loss_val = self.sess.run([d_optimizer, self.d_loss],
+          feed_dict={self.X_placeholder: self.chroma})
+      print("epoch %d: self.d_loss = %f" % (epoch, loss_val))
       if epoch % config.checkpoint_frequency == 0:
         """
         tf.saved_model.simple_save(
