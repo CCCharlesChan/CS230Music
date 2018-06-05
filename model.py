@@ -39,6 +39,7 @@ class RnnGan(object):
     self.chord2index = chord2index
     self.flags = flags
     self.tensorboard_log_dir = flags.tensorboard_log_dir
+    self.model_save_dir = flags.model_save_dir
 
     # Initialize tensorboard filewriter (saves summary data for visualization).
     if not self.tensorboard_log_dir:
@@ -51,7 +52,8 @@ class RnnGan(object):
     #self.g_sample = self.generator()
     #self.d_logit_fake = self.discriminator(self.g_sample)
 
-    # Append extra class to the end of the predicted output to indicate whether     # or not the input data was real.
+    # Append extra class to the end of the predicted output to indicate
+    # or not the input data was real.
     self.d_logit_real = tf.concat(
         [self.d_logit_real, tf.ones(shape=[890, 15122, 1])], axis=2)
     #self.d_logit_fake = tf.concat(
@@ -62,7 +64,7 @@ class RnnGan(object):
 
     # Discriminator loss.
     self.d_loss_real = tf.reduce_mean(
-        tf.nn.sigmoid_cross_entropy_with_logits(
+        tf.nn.softmax_cross_entropy_with_logits_v2(
             logits=self.d_logit_real,
             labels=tf.concat(
                 [self.labels, tf.ones(shape=[890, 15122, 1])], axis=2)))
@@ -87,13 +89,30 @@ class RnnGan(object):
     #        self.g_loss) # TODO: only train G vars, i.e. var_list=self.theta_g)
 
     #tf.global_variables_initializer()
+
+    self.model_saver = tf.train.Saver()
     self.sess.run(tf.global_variables_initializer())
 
     for epoch in xrange(config.num_epoch):
       # TODO: make this work with generator.
-      _, loss_val = self.sess.run([d_optimizer, self.d_loss],
-          feed_dict={self.X_placeholder: self.chroma})
-      print("epoch %d: self.d_loss = %f" % (epoch, loss_val))
+      #_, loss_val = self.sess.run([d_optimizer, self.d_loss],
+      #    feed_dict={self.X_placeholder: self.chroma})
+      #print("epoch %d: self.d_loss = %f" % (epoch, loss_val))
+      if epoch % config.checkpoint_frequency == 0:
+        """
+        tf.saved_model.simple_save(
+            session=self.sess, 
+            export_dir=config.model_save_dir,
+            inputs={'chroma': self.chroma, 'chord': self.chord},
+            outputs={},
+        )
+        """
+        self.model_saver.save(
+            sess=self.sess,
+            save_path=self.model_save_dir + r'/',
+            global_step=epoch,
+        )
+        print("Saved model to %s." % self.model_save_dir)
        
 
   def generator(self):
@@ -115,6 +134,8 @@ class RnnGan(object):
         tf.float32, shape=(890, 15122, 25), name="discriminator_X")
     #Y = tf.placeholder(
     #    tf.float32, shape=(890, 15122, self.DISCRIMINATOR_OUTPUT_NUM_CLASSES))
+    self.Z_placeholder = tf.placeholder(
+        tf.float32, shape=(890, 15122, 1), name="discriminator_Z")
 
     with tf.variable_scope("discriminator_lstm_fw", reuse=tf.AUTO_REUSE):
         # 2-layer LSTM, each cell has num_hidden_units hidden units.
@@ -166,5 +187,11 @@ class RnnGan(object):
 
     return logits
 
-  def load(self, checkpoint_dir):
-    pass
+  def load(self, model_load_dir):
+    #tf.saved_model.loader.load(
+    #    self.sess, [tag_constants.SERVING], model_load_dir)
+    self.model_saver = tf.train.import_meta_graph('/path/to/model.meta')
+    self.model_saver.restore(sess,tf.train.latest_checkpoint('./'))
+    print("Loaded model from %s." % model_load_dir)
+    
+    # Do some stuff with the loaded model.
