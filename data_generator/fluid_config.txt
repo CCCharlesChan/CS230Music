@@ -1,0 +1,2 @@
+load GS.sf2
+select 0 1 0 0

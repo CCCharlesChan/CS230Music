@@ -83,7 +83,7 @@ def mcgill_preprocess(sample_range=1301,
     chord = np.zeros((0, max_frame_num, 2))
   
   true_samples = 0
-  for sample_num in xrange(sample_range):
+  for sample_num in range(sample_range):
     chroma_dir = os.path.join(
         working_dir, chroma_base,'{:0>4}'.format(sample_num))
     chord_dir = os.path.join(
@@ -235,17 +235,17 @@ def main(unused_argv=None):
   ############################# MODIFY FLAGS HERE ############################
 
   # working_dir should be full path to where McGill_Billboard dataset is.
-  working_dir = ("/Users/Eli/Documents/Stanford/cs230/project/data/"
+  working_dir = ("/Users/charleschen/Documents/Courses/CS230/Project/dataset/"
                  "McGill_Billboard")
 
   # output_dir needs to already exist; full path to directory to save .npy
   # output files.
-  output_dir = ("/Users/Eli/Documents/Stanford/cs230/project/data/"
-                "preprocessed_mcgill_list")
+  output_dir = ("/Users/charleschen/Documents/Courses/CS230/Project/dataset/"
+                "preprocessed_mcgill_matrix")
 
   # See def mcgill_preprocess. Whether to store output data in Python List or
   # zero-pad with numpy arrays.
-  output_list = True
+  output_list = False
 
   ############################### END FLAGS ##################################
 
