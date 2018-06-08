@@ -44,6 +44,9 @@ class RnnGan(object):
     self.tensorboard_log_dir = flags.tensorboard_log_dir
     self.model_save_dir = flags.model_save_dir
 
+    # Extract some useful numbers.
+    self.num_songs = self.chroma.shape[0]
+
     # Initialize tensorboard filewriter (saves summary data for visualization).
     if not self.tensorboard_log_dir:
       self.tensorboard_log_dir = os.getcwd()
@@ -58,7 +61,7 @@ class RnnGan(object):
     # Append extra class to the end of the predicted output to indicate
     # or not the input data was real.
     self.d_logit_real = tf.concat(
-        [self.d_logit_real, tf.ones(shape=[890, 15122, 1])], axis=2)
+        [self.d_logit_real, tf.ones(shape=[self.num_songs, 15122, 1])], axis=2)
     print("self.d_logit_real.shape:", self.d_logit_real.shape)
     #self.d_logit_fake = tf.concat(
     #    [self.d_logit_fake, tf.zeros(shape=[890, 15122, 1])], axis=2)
@@ -75,7 +78,7 @@ class RnnGan(object):
     # Then, append last class, all one's for real data.
     self.labels_one_hot_real = tf.concat([
         self.labels_one_hot,
-        tf.ones(shape=[890, 15122, 1])], axis=2)
+        tf.ones(shape=[self.num_songs, 15122, 1])], axis=2)
     print("self.labels_one_hot_real.shape:", self.labels_one_hot_real.shape)
 
     # Discriminator loss.
@@ -108,20 +111,14 @@ class RnnGan(object):
     self.model_saver = tf.train.Saver()
     self.sess.run(tf.global_variables_initializer())
 
-    for epoch in xrange(config.num_epoch):
+    for epoch in xrange(1, config.num_epoch+1):
       # TODO: make this work with generator.
       _, loss_val = self.sess.run([d_optimizer, self.d_loss],
           feed_dict={self.X_placeholder: self.chroma})
       print("epoch %d: self.d_loss = %f" % (epoch, loss_val))
+
+      # Save the model every once in a while.
       if epoch % config.checkpoint_frequency == 0:
-        """
-        tf.saved_model.simple_save(
-            session=self.sess, 
-            export_dir=config.model_save_dir,
-            inputs={'chroma': self.chroma, 'chord': self.chord},
-            outputs={},
-        )
-        """
         self.model_saver.save(
             sess=self.sess,
             save_path=self.model_save_dir + r'/',
@@ -145,11 +142,9 @@ class RnnGan(object):
     # Input data X of shape [m, frame, chroma vector]. Zero-padded.
     # Output should be [m, frame, prediction] where prediction is size 1.
     self.X_placeholder = tf.placeholder(
-        tf.float32, shape=(890, 15122, 25), name="discriminator_X")
+        tf.float32, shape=(None, 15122, 25), name="discriminator_X")
     #Y = tf.placeholder(
     #    tf.float32, shape=(890, 15122, self.DISCRIMINATOR_OUTPUT_NUM_CLASSES))
-    self.Z_placeholder = tf.placeholder(
-        tf.float32, shape=(890, 15122, 1), name="discriminator_Z")
 
     with tf.variable_scope("discriminator_lstm_fw", reuse=tf.AUTO_REUSE):
         # 2-layer LSTM, each cell has num_hidden_units hidden units.
@@ -225,7 +220,5 @@ class RnnGan(object):
     np.save(os.path.join(output_path, "predictions.npy"), preds)
     print("Saved predictions.npy and probabilities.npy to '%s'" % output_path)
 
-    print("probabilities[3][0:10]:\n", probabilities[3][0:10])
-    print()
-    print("predictions[3][0:10]:\n", predictions[3][0:10])
-    print()
+    #print("************* probs[3][0:10]:\n", probs[3][0:10])
+    #print("************* preds[3][0:10]:\n", preds[3][0:10])
