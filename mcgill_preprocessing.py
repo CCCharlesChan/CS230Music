@@ -266,27 +266,36 @@ def main(unused_argv=None):
 
   # output_dir needs to already exist; full path to directory to save .npy
   # output files.
-  output_dir = ("/Users/charleschen/Documents/Courses/CS230/Project/dataset/"
-                "preprocessed_mcgill_matrix")
+  test_output_dir = ("/Users/charleschen/Documents/Courses/CS230/Project/dataset/"
+                     "preprocessed_mcgill_matrix_test")
+  train_output_dir = ("/Users/charleschen/Documents/Courses/CS230/Project/dataset/"
+                      "preprocessed_mcgill_matrix_train")
 
   # See def mcgill_preprocess. Whether to store output data in Python List or
   # zero-pad with numpy arrays.
   output_list = False
 
-  # Either "train" or "test", the data set to extract
-  data_set_type = "train"
-
   ############################### END FLAGS ##################################
 
   preprocess_data_and_store(
       input_dir=working_dir,
-      output_dir=output_dir,
+      output_dir=test_output_dir,
       output_list=output_list,
-      data_set_type=data_set_type,
+      data_set_type="test",
       verbose=True,
   )
 
-  extract_song_lengths(input_dir=output_dir, output_dir=output_dir)
+  extract_song_lengths(input_dir=output_dir, output_dir=test_output_dir)
+
+  preprocess_data_and_store(
+      input_dir=working_dir,
+      output_dir=train_output_dir,
+      output_list=output_list,
+      data_set_type="train",
+      verbose=True,
+  )
+
+  extract_song_lengths(input_dir=output_dir, output_dir=train_output_dir)
 
 
 if __name__ == "__main__":
