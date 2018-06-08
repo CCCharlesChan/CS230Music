@@ -29,6 +29,9 @@ class RnnGan(object):
     # chords, and another class for whether or not the input is real. So 
     # 24 + 1 + 1 = 26.
     self.DISCRIMINATOR_OUTPUT_NUM_CLASSES = 26
+    # For true labels, 24 chords + N = 25 total. For converting chords to one-
+    # hot vectors.
+    self.LABEL_ONE_HOT_SIZE = 25
     ##############################
 
     self.sess = sess
@@ -56,18 +59,30 @@ class RnnGan(object):
     # or not the input data was real.
     self.d_logit_real = tf.concat(
         [self.d_logit_real, tf.ones(shape=[890, 15122, 1])], axis=2)
+    print("self.d_logit_real.shape:", self.d_logit_real.shape)
     #self.d_logit_fake = tf.concat(
     #    [self.d_logit_fake, tf.zeros(shape=[890, 15122, 1])], axis=2)
 
     # Remove timeline from chord labels. np.delete returns new array.
     self.labels = np.delete(self.chord, 0, axis=2)
+    #print("self.labels.shape:", self.labels.shape)
+
+    # Convert labels to one-hot vector.
+    self.labels_one_hot = tf.squeeze(tf.one_hot(
+        indices=self.labels, depth=self.LABEL_ONE_HOT_SIZE))
+    #print("self.labels_one_hot.shape:", self.labels_one_hot.shape)
+
+    # Then, append last class, all one's for real data.
+    self.labels_one_hot_real = tf.concat([
+        self.labels_one_hot,
+        tf.ones(shape=[890, 15122, 1])], axis=2)
+    print("self.labels_one_hot_real.shape:", self.labels_one_hot_real.shape)
 
     # Discriminator loss.
     self.d_loss_real = tf.reduce_mean(
         tf.nn.softmax_cross_entropy_with_logits_v2(
             logits=self.d_logit_real,
-            labels=tf.concat(
-                [self.labels, tf.ones(shape=[890, 15122, 1])], axis=2)))
+            labels=self.labels_one_hot_real))
     #self.d_loss_fake = tf.reduce_mean(
     #    tf.nn.sigmoid_cross_entropy_with_logits(
     #        logits=self.d_logit_fake,
@@ -128,8 +143,7 @@ class RnnGan(object):
     """
 
     # Input data X of shape [m, frame, chroma vector]. Zero-padded.
-    # Output should be [m, frame, prediction] where prediction is a vector
-    # of size 26 (25 chord classes + extra bit for real or generated data).
+    # Output should be [m, frame, prediction] where prediction is size 1.
     self.X_placeholder = tf.placeholder(
         tf.float32, shape=(890, 15122, 25), name="discriminator_X")
     #Y = tf.placeholder(
@@ -179,19 +193,39 @@ class RnnGan(object):
 
     # Concatenate forward and backward outputs.
     outputs = tf.concat([output_fw, output_bw], axis=2)
-    #print("concatenated outputs.shape:", outputs.shape)
+    print("concatenated outputs.shape:", outputs.shape)
 
     # Add fully connected layer as input to softmax later.
-    logits = tf.contrib.layers.fully_connected(outputs, 1, activation_fn=None)
+    logits = tf.contrib.layers.fully_connected(
+        outputs, self.LABEL_ONE_HOT_SIZE, activation_fn=None)
+    self.d_logits = logits
     print("logits.shape:", logits.shape)
 
     return logits
 
-  def load(self, model_load_dir):
+  def load(self, sess, model_load_dir, model_load_meta_path, output_path):
     #tf.saved_model.loader.load(
     #    self.sess, [tag_constants.SERVING], model_load_dir)
-    self.model_saver = tf.train.import_meta_graph('/path/to/model.meta')
-    self.model_saver.restore(sess,tf.train.latest_checkpoint('./'))
-    print("Loaded model from %s." % model_load_dir)
-    
-    # Do some stuff with the loaded model.
+    self.model_saver = tf.train.import_meta_graph(model_load_meta_path)
+    self.model_saver.restore(sess,tf.train.latest_checkpoint(model_load_dir))
+    print("Loaded model from %s, with meta file %s" % (
+        model_load_dir, model_load_meta_path))
+
+    probabilities = tf.nn.softmax(self.d_logits)
+    predictions = tf.argmax(probabilities, axis=2)
+    self.sess.run(tf.global_variables_initializer())
+    probs, preds = self.sess.run(
+        [probabilities, predictions],
+        feed_dict={self.X_placeholder: self.chroma})
+    print("probs.shape:", probs.shape)
+    print("preds.shape:", preds.shape)
+
+    # save predictions somewhere.
+    np.save(os.path.join(output_path, "probabilities.npy"), probs)
+    np.save(os.path.join(output_path, "predictions.npy"), preds)
+    print("Saved predictions.npy and probabilities.npy to '%s'" % output_path)
+
+    print("probabilities[3][0:10]:\n", probabilities[3][0:10])
+    print()
+    print("predictions[3][0:10]:\n", predictions[3][0:10])
+    print()

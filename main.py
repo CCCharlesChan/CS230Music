@@ -25,10 +25,17 @@ flags.DEFINE_integer("num_hidden_units", 10,
                      "number of hidden units in each layer.")
 flags.DEFINE_string("input_data_dir", None, "path to training/test data.")
 flags.DEFINE_string("model_load_dir", None,
-    "path to load a model previously trained with --is_train=True. This runs a "    "test or validation on input_data_dir.")
+    "path to load a model previously trained with --is_train=True. This runs a "
+    "test or validation on input_data_dir.")
+flags.DEFINE_string("model_load_meta_path", None,
+    "path to .meta file of the saved model.")
 flags.DEFINE_string("model_save_dir", None,
     "path to save the trained model. --is_train must be True. If unspecified, "
     "creates a dir under current working dir called './model_YYYYMMDD_HHMMSS'.")
+flags.DEFINE_string("output_path", None,
+    "path to save predicted outputs. This is a no-op if in training mode "
+    "(--is_train). Saves prediction.npy in this output_path. Default uses "
+    "--model_load_dir.")
 flags.DEFINE_string("tensorboard_log_dir", None, 
     "path to save tensorboard log data, defaults to current working dir.")
 flags.DEFINE_boolean("is_train", False, "True for training, False for testing.")
@@ -37,7 +44,7 @@ FLAGS = flags.FLAGS
 
 def main(_):
   """Read preprocessed data, init parameters, train, infer."""
-  pp.pprint(flags.FLAGS.__flags)
+  pp.pprint(flags.FLAGS.flag_values_dict())
 
   if FLAGS.is_train:
     if not FLAGS.input_data_dir:
@@ -62,6 +69,7 @@ def main(_):
   song_lengths = np.load(
       os.path.join(FLAGS.input_data_dir, "song_lengths.npy"))
 
+  print("++++++++++++ INPUT DATA SANITY CHECK ++++++++++++++")
   print("chroma.shape:", chroma.shape)
   print("chord.shape:", chord.shape)
   print("len(chord2index.keys()):", len(chord2index.keys()))
@@ -69,6 +77,7 @@ def main(_):
   print("len(song_num):", len(song_num))
   print("song_lengths.shape:", song_lengths.shape)
   print("chroma.dtype:", chroma.dtype)
+  print("+++++++++++++++++++++++++++++++++++++++++++++++++++")
 
   with tf.Session(config=tf.ConfigProto()) as sess:
     rnn_gan = RnnGan(
@@ -85,13 +94,28 @@ def main(_):
       rnn_gan.train(FLAGS)
       print("========== DONE TRRAINING ===========")
     else:
-      if not FLAGS.model_load_dir:
+      if not FLAGS.model_load_dir or not FLAGS.model_load_meta_path:
         raise ValueError("Train model with --is_train, then run test mode with "
-                         "trained output at --model_load_dir")
+                         "trained output at --model_load_dir and meta file at "
+                         "--model_load_meta_path.")
       if not os.path.exists(FLAGS.model_load_dir):
         raise ValueError("Cannot find model_load_dir, are you sure it "
                          "exists? %s" % FLAGS.model_load_dir)
-      rnn_gan.load(sess, FLAGS.model_load_dir)
+      if not os.path.exists(FLAGS.model_load_meta_path):
+        raise ValueError("Cannot find model_load_meta_path, are you sure it "
+                         "exists? %s" % FLAGS.model_load_meta_path)
+      
+      if not FLAGS.output_path:
+        FLAGS.output_path = FLAGS.model_load_dir
+
+      print("============ GENERATING VALIDATION OUTPUT ============")
+      rnn_gan.load(
+          sess,
+          FLAGS.model_load_dir,
+          FLAGS.model_load_meta_path,
+          FLAGS.output_path,
+      )
+      print("================= DONE VALIDATION =================")
 
 
 if __name__ == "__main__":
