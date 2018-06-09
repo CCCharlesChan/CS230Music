@@ -14,6 +14,9 @@ def mirex_lines_from_file(filename):
     mirex_lines = (line for line in mirex_lines if line.strip() != "")
     return mirex_lines    
 
+def parse_line(line, scale):
+
+
 def parse_line(line):
     start_str, end_str, chord = line.split()
     start, end = map(float, [start_str, end_str])
@@ -33,17 +36,11 @@ def mirex_to_array(filename):
     indices, chords = zip(*map(parse_line, mirex_lines))
     return create_array(indices, chords)
 
-# def compare_mirexes(filename1, filename2):
-#     a1 = mirex_to_array(filename1)
-#     a2 = mirex_to_array(filename2)
+def compare_mirexes(filename1, filename2):
+    a1 = mirex_to_array(filename1)
+    a2 = mirex_to_array(filename2)
 
-#     union = []
-#     for i, j in zip(a1, a2):
-#         if i == j:
-
-#     intersection = []
-#     for i, j in zip(a1, a2):
-#         if i == j:
+    return overlap
 
 def overlap_ratio(a, b):
     scale = 1/len(a)
@@ -78,6 +75,31 @@ def runlength_extract(a):
             current = -1
     return res
 
+npy_loaded = {}
+def npy_file(path):
+    if path in npy_loaded:
+        return npy_loaded[path]
+    else:
+        npy = np.load(path)
+        npy_loaded[path] = npy
+        return npy
+
+idx_to_song = ['0811', '0064', '0891', '0253', '0107', '0973', '0913', '0824', '0964']
+
+def idx_array_to_chord_array(idx_array, index2chord):
+    out = []
+    for i in idx_array:
+        out.append(index2chord[i])
+    return out
+
+
+def preds_to_array(pred_filename, index2chord_filename, song_idx):
+    preds = npy_file(pred_filename)
+    index2chord = npy_file(index2chord_filename).item()
+
+    chords = idx_array_to_chord_array(preds, index2chord)
+
+    return chords
 
 if __name__ == '__main__':
     import glob
@@ -87,13 +109,24 @@ if __name__ == '__main__':
     #     '/home/c/CS230/Project/Data/McGill_Billboard/MIREX_style/0003/majmin7inv.lab',
     #     '/home/c/CS230/Project/Data/McGill_Billboard/MIREX_style/0003/majmininv.lab',
     #     '/home/c/CS230/Project/Data/McGill_Billboard/LAB_files/0003/full.lab']
-    arrays = map(mirex_to_array, files)
-    for array in arrays:
-        if '0' in array:
-            print('!!!')
+    # arrays = map(mirex_to_array, files)
+    # for array in arrays:
+    #     if '0' in array:
+    #         print('!!!')
+
+    pred_filename = ""
+    index2chord_filename = ""
+
+    for i in range(len(idx_to_song)):
+        file = '/home/c/CS230/Project/Data/McGill_Billboard/MIREX_style/{}/majmin.lab'.format(idx_to_song[i])
+        mcgill_array = mirex_to_array(file)
+        pred_array = preds_to_array(pred_filename, index2chord_filename, i)
+
+        print(overlap_ratio(mcgill_array, pred_array))
 
 
     # compare 2 files
     # compare to csv
     # weighting
     # generator tuesday
+
