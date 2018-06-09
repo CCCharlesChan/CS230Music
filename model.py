@@ -47,6 +47,18 @@ class RnnGan(object):
     # Extract some useful numbers.
     self.num_songs = self.chroma.shape[0]
 
+    # Batching data.
+    self.chroma_input_placeholder = tf.placeholder(chroma.dtype, chroma.shape)
+    self.chord_input_placeholder = tf.placeholder(chord.dtype, chord.shape)
+    self.sequence_lengths_input_placeholder = tf.placeholder(
+        sequence_lengths.dtype, sequence_lengths.shape)
+    self.dataset = tf.data.Dataset.from_tensor_slices((
+        self.chroma_input_placeholder,
+        self.chord_input_placeholder,
+        self.sequence_lengths_input_placeholder))
+    self.dataset = self.dataset.batch(self.flags.minibatch_size)
+    self.iterator = self.dataset.make_initializable_iterator()
+
     # Initialize tensorboard filewriter (saves summary data for visualization).
     if not self.tensorboard_log_dir:
       self.tensorboard_log_dir = os.getcwd()
@@ -61,7 +73,8 @@ class RnnGan(object):
     # Append extra class to the end of the predicted output to indicate
     # or not the input data was real.
     self.d_logit_real = tf.concat(
-        [self.d_logit_real, tf.ones(shape=[self.num_songs, 15122, 1])], axis=2)
+        [self.d_logit_real,
+         tf.ones(shape=[self.flags.minibatch_size, 15122, 1])], axis=2)
     print("self.d_logit_real.shape:", self.d_logit_real.shape)
     #self.d_logit_fake = tf.concat(
     #    [self.d_logit_fake, tf.zeros(shape=[890, 15122, 1])], axis=2)
@@ -78,7 +91,7 @@ class RnnGan(object):
     # Then, append last class, all one's for real data.
     self.labels_one_hot_real = tf.concat([
         self.labels_one_hot,
-        tf.ones(shape=[self.num_songs, 15122, 1])], axis=2)
+        tf.ones(shape=[self.flags.minibatch_size, 15122, 1])], axis=2)
     print("self.labels_one_hot_real.shape:", self.labels_one_hot_real.shape)
 
     # Discriminator loss.
@@ -111,10 +124,27 @@ class RnnGan(object):
     self.model_saver = tf.train.Saver()
     self.sess.run(tf.global_variables_initializer())
 
+    # Initialize batches.
+    self.sess.run(self.iterator.initializer,
+        feed_dict={
+            self.chroma_input_placeholder: self.chroma,
+            self.chord_input_placeholder: self.chord,
+            self.sequence_lengths_input_placeholder: self.sequence_lengths,
+        }
+    )
+    
+    next_element = self.iterator.get_next()
+
     for epoch in xrange(1, config.num_epoch+1):
       # TODO: make this work with generator.
-      _, loss_val = self.sess.run([d_optimizer, self.d_loss],
-          feed_dict={self.X_placeholder: self.chroma})
+      while True:
+        try:
+          _, _, loss_val = self.sess.run(
+              [d_optimizer, self.d_loss, next_element],
+              feed_dict={self.X_placeholder: self.chroma})
+        except tf.errors.OutOfRangeError:
+          break
+
       print("epoch %d: self.d_loss = %f" % (epoch, loss_val))
 
       # Save the model every once in a while.
@@ -143,6 +173,8 @@ class RnnGan(object):
     # Output should be [m, frame, prediction] where prediction is size 1.
     self.X_placeholder = tf.placeholder(
         tf.float32, shape=(None, 15122, 25), name="discriminator_X")
+    self.seq_len_placeholder = tf.placeholder(
+        tf.float32, shape=(self.flags.minibatch_size), name="seq_len")
     #Y = tf.placeholder(
     #    tf.float32, shape=(890, 15122, self.DISCRIMINATOR_OUTPUT_NUM_CLASSES))
 
@@ -180,7 +212,7 @@ class RnnGan(object):
           # sequence_length s where to stop in a single training example.
           # Since we zero-pad inputs, we should stop early based on actual song
           # length to save computation cost.
-          sequence_length=self.sequence_lengths,
+          sequence_length=self.seq_len_placeholder,
           inputs=self.X_placeholder)
 
     #print("output_fw.shape:", output_fw.shape)
@@ -193,7 +225,8 @@ class RnnGan(object):
     # Add fully connected layer as input to softmax later.
     logits = tf.contrib.layers.fully_connected(
         outputs, self.LABEL_ONE_HOT_SIZE, activation_fn=None)
-    self.d_logits = logits
+    if not self.flags.is_train:
+      self.d_logits = logits
     print("logits.shape:", logits.shape)
 
     return logits

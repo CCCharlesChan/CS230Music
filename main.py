@@ -16,10 +16,11 @@ flags = tf.flags
 logging = tf.logging
 pp = pprint.PrettyPrinter()
 
-flags.DEFINE_float("beta1", 0.9, "beta1 for AdamOptimizer")
-flags.DEFINE_float("learning_rate", 0.001, "learning rate for AdamOptimizer")
+flags.DEFINE_float("beta1", 0.9, "beta1 for AdamOptimizer.")
+flags.DEFINE_float("learning_rate", 0.001, "learning rate for AdamOptimizer.")
 flags.DEFINE_integer("checkpoint_frequency", 1, 
     "How often to save model during training, in num epochs [Default=1].")
+flags.DEFINE_integer("minibatch_size", 64, "size of one batch for training.")
 flags.DEFINE_integer("num_epoch", 1, "epoch or iterations to run training.")
 flags.DEFINE_integer("num_hidden_units", 10, 
                      "number of hidden units in each layer.")
