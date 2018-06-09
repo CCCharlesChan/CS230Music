@@ -1,4 +1,5 @@
 from __future__ import division
+from __future__ import print_function
 import numpy as np
 
 from multiprocessing import Pool
@@ -45,7 +46,7 @@ def overlap_ratio(a, b, length):
     for i, j in zip(a[:length], b[:length]):
         if i == j:
             correct += 1
-    return scale * correct
+    return scale * correct, correct
 
 def weighted_overlap_ratio(a, b):
     # ?
@@ -85,32 +86,34 @@ idx_to_song = ['0811', '0064', '0891', '0253', '0107', '0973', '0913', '0824', '
 
 def idx_array_to_chord_array(idx_array, index2chord):
     out = []
+    keyerror_count = 0
     for i in idx_array:
         try:
             out.append(index2chord[i])
         except:
-            print("keyerror: {}".format(i))
+            #print("keyerror: {}".format(i))
             out.append('?')
-    return out
+            keyerror_count += 1
+    return out, keyerror_count
 
 
 def preds_to_array(pred_filename, index2chord_filename, song_idx):
     preds = npy_file(pred_filename)[song_idx]
     index2chord = npy_file(index2chord_filename).item()
 
-    chords = idx_array_to_chord_array(preds, index2chord)
-    return chords
+    chords, incorrect = idx_array_to_chord_array(preds, index2chord)
+    return chords, incorrect
 
 def chords_to_array(pred_filename, index2chord_filename, song_idx):
     preds = npy_file(pred_filename)[song_idx,:,1]
     index2chord = npy_file(index2chord_filename).item()
 
-    chords = idx_array_to_chord_array(preds, index2chord)
+    chords, _ = idx_array_to_chord_array(preds, index2chord)
     return chords
 
 if __name__ == '__main__':
     import glob
-    files = glob.glob('/home/c/CS230/Project/Data/McGill_Billboard/*/*/*.lab')
+    #files = glob.glob('/home/c/CS230/Project/Data/McGill_Billboard/*/*/*.lab')
     # files = ['/home/c/CS230/Project/Data/McGill_Billboard/MIREX_style/0003/majmin.lab',
     #     '/home/c/CS230/Project/Data/McGill_Billboard/MIREX_style/0003/majmin7.lab',
     #     '/home/c/CS230/Project/Data/McGill_Billboard/MIREX_style/0003/majmin7inv.lab',
@@ -121,17 +124,27 @@ if __name__ == '__main__':
     #     if '0' in array:
     #         print('!!!')
 
-    pred_filename = "/home/ubuntu/CS230Music/rnngan_20180609_082130/predictions.npy"
-    index2chord = "/home/ubuntu/McGill_Billboard_matrix_train/index2chord.npy"
-    chord_filename = "/home/ubuntu/McGill_Billboard_matrix_train/chord.npy"
-    song_lengths_filename = "/home/ubuntu/McGill_Billboard_matrix_train/song_lengths.npy"
+    pred_filename = "/Users/Eli/Documents/Stanford/cs230/project/CS230Music/rnngan_20180609_124022/preds-5.npy"
+    index2chord = "/Users/Eli/Documents/Stanford/cs230/project/data/preprocessed_validation/index2chord.npy"
+    chord_filename = "/Users/Eli/Documents/Stanford/cs230/project/data/preprocessed_validation/chord.npy"
+    song_lengths_filename = "/Users/Eli/Documents/Stanford/cs230/project/data/preprocessed_validation/song_lengths.npy"
 
+    OR_sum = 0.0
+    incorrect_sum = 0
     for i in range(len(idx_to_song)):
         file = '/home/c/CS230/Project/Data/McGill_Billboard/MIREX_style/{}/majmin.lab'.format(idx_to_song[i])
-        pred_array = preds_to_array(pred_filename, index2chord, i)
+        pred_array, incorrect = preds_to_array(pred_filename, index2chord, i)
         chord_array = chords_to_array(chord_filename, index2chord, i)
 
         length = npy_file(song_lengths_filename)[i]
 
+        OR, correct = overlap_ratio(chord_array, pred_array, length)
+        print("song %d)\ncorrect/total frames: %d/%d\nOR: %f" % (
+            i+1, correct, length, OR), end='\n\n')
 
-        print(overlap_ratio(chord_array, pred_array, length))
+        OR_sum += OR
+        incorrect_sum += incorrect
+
+    print("average OR across %d songs:" % len(idx_to_song), 
+          OR_sum/len(idx_to_song))
+    print("Number of incorrect predictions:", incorrect_sum)
