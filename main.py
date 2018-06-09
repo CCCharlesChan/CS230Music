@@ -16,10 +16,11 @@ flags = tf.flags
 logging = tf.logging
 pp = pprint.PrettyPrinter()
 
-flags.DEFINE_float("beta1", 0.9, "beta1 for AdamOptimizer")
-flags.DEFINE_float("learning_rate", 0.001, "learning rate for AdamOptimizer")
+flags.DEFINE_float("beta1", 0.9, "beta1 for AdamOptimizer.")
+flags.DEFINE_float("learning_rate", 0.001, "learning rate for AdamOptimizer.")
 flags.DEFINE_integer("checkpoint_frequency", 1, 
     "How often to save model during training, in num epochs [Default=1].")
+flags.DEFINE_integer("minibatch_size", 64, "size of one batch for training.")
 flags.DEFINE_integer("num_epoch", 1, "epoch or iterations to run training.")
 flags.DEFINE_integer("num_hidden_units", 10, 
                      "number of hidden units in each layer.")
@@ -56,10 +57,14 @@ def main(_):
       FLAGS.model_save_dir = model_dir
 
   # TODO(elizachu): figure out better way to store/load preprocessed data.
-  chroma = np.load(
-      os.path.join(FLAGS.input_data_dir, "chroma.npy")).astype(np.float32)
-  chord = np.load(
-      os.path.join(FLAGS.input_data_dir, "chord.npy")).astype(np.float32)
+  chroma = np.delete(np.load(
+      os.path.join(FLAGS.input_data_dir, "chroma.npy")).astype(np.float32),
+      0,
+      axis=2)
+  chord = np.delete(
+      np.load(os.path.join(FLAGS.input_data_dir, "chord.npy")).astype(np.int32),
+      0,
+      axis=2)
   chord2index = np.load(
       os.path.join(FLAGS.input_data_dir, "chord2index.npy")).item()
   index2chord = np.load(
@@ -77,6 +82,7 @@ def main(_):
   print("len(song_num):", len(song_num))
   print("song_lengths.shape:", song_lengths.shape)
   print("chroma.dtype:", chroma.dtype)
+  print("chord.dtype:", chord.dtype)
   print("+++++++++++++++++++++++++++++++++++++++++++++++++++")
 
   with tf.Session(config=tf.ConfigProto()) as sess:
