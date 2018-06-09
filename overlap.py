@@ -94,11 +94,17 @@ def idx_array_to_chord_array(idx_array, index2chord):
 
 
 def preds_to_array(pred_filename, index2chord_filename, song_idx):
-    preds = npy_file(pred_filename)
+    preds = npy_file(pred_filename)[song_idx]
     index2chord = npy_file(index2chord_filename).item()
 
     chords = idx_array_to_chord_array(preds, index2chord)
+    return chords
 
+def chords_to_array(pred_filename, index2chord_filename, song_idx):
+    preds = npy_file(pred_filename)[song_idx,:,1]
+    index2chord = npy_file(index2chord_filename).item()
+
+    chords = idx_array_to_chord_array(preds, index2chord)
     return chords
 
 if __name__ == '__main__':
@@ -114,19 +120,14 @@ if __name__ == '__main__':
     #     if '0' in array:
     #         print('!!!')
 
-    pred_filename = ""
-    index2chord_filename = ""
+    pred_filename = "/home/ubuntu/CS230Music/rnngan_20180609_082130/predictions.npy"
+    index2chord_validation = "/home/ubuntu/McGill_Billboard_validation_matrix_train/index2chord.npy"
+    index2chord_train = "/home/ubuntu/Data/McGill_Billboard_test/index2chord.npy"
+    chord_filename = "/home/ubuntu/McGill_Billboard_validation_matrix_train/chord.npy"
 
     for i in range(len(idx_to_song)):
         file = '/home/c/CS230/Project/Data/McGill_Billboard/MIREX_style/{}/majmin.lab'.format(idx_to_song[i])
-        mcgill_array = mirex_to_array(file)
-        pred_array = preds_to_array(pred_filename, index2chord_filename, i)
+        pred_array = preds_to_array(pred_filename, index2chord_validation, i)
+        chord_array = chords_to_array(chord_filename, index2chord_train, i)
 
-        print(overlap_ratio(mcgill_array, pred_array))
-
-
-    # compare 2 files
-    # compare to csv
-    # weighting
-    # generator tuesday
-
+        print(overlap_ratio(chord_array, pred_array))
