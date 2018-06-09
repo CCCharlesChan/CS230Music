@@ -14,9 +14,6 @@ def mirex_lines_from_file(filename):
     mirex_lines = (line for line in mirex_lines if line.strip() != "")
     return mirex_lines    
 
-def parse_line(line, scale):
-
-
 def parse_line(line):
     start_str, end_str, chord = line.split()
     start, end = map(float, [start_str, end_str])
@@ -121,10 +118,10 @@ if __name__ == '__main__':
     #         print('!!!')
 
     pred_filename = "/home/ubuntu/CS230Music/rnngan_20180609_082130/predictions.npy"
-    index2chord_validation = "/home/ubuntu/McGill_Billboard_validation_matrix_train/index2chord.npy"
+    index2chord_validation = "/home/ubuntu/McGill_Billboard_matrix_train/index2chord.npy"
     index2chord_train = "/home/ubuntu/Data/McGill_Billboard_test/index2chord.npy"
-    chord_filename = "/home/ubuntu/McGill_Billboard_validation_matrix_train/chord.npy"
-    song_lengths_filename = "/home/ubuntu/McGill_Billboard_validation_matrix_train/song_lengths.npy"
+    chord_filename = "/home/ubuntu/McGill_Billboard_matrix_train/chord.npy"
+    song_lengths_filename = "/home/ubuntu/McGill_Billboard_matrix_train/song_lengths.npy"
 
     for i in range(len(idx_to_song)):
         file = '/home/c/CS230/Project/Data/McGill_Billboard/MIREX_style/{}/majmin.lab'.format(idx_to_song[i])
