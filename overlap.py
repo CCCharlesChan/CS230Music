@@ -42,7 +42,7 @@ def compare_mirexes(filename1, filename2):
 def overlap_ratio(a, b, length):
     scale = 1/length
     correct = 0
-    for i, j in zip(a, b)[:length]:
+    for i, j in zip(a[:length], b[:length]):
         if i == j:
             correct += 1
     return scale * correct
@@ -86,7 +86,11 @@ idx_to_song = ['0811', '0064', '0891', '0253', '0107', '0973', '0913', '0824', '
 def idx_array_to_chord_array(idx_array, index2chord):
     out = []
     for i in idx_array:
-        out.append(index2chord[i])
+        try:
+            out.append(index2chord[i])
+        except:
+            print("keyerror: {}".format(i))
+            out.append('?')
     return out
 
 
@@ -118,15 +122,14 @@ if __name__ == '__main__':
     #         print('!!!')
 
     pred_filename = "/home/ubuntu/CS230Music/rnngan_20180609_082130/predictions.npy"
-    index2chord_validation = "/home/ubuntu/McGill_Billboard_matrix_train/index2chord.npy"
-    index2chord_train = "/home/ubuntu/Data/McGill_Billboard_test/index2chord.npy"
+    index2chord = "/home/ubuntu/McGill_Billboard_matrix_train/index2chord.npy"
     chord_filename = "/home/ubuntu/McGill_Billboard_matrix_train/chord.npy"
     song_lengths_filename = "/home/ubuntu/McGill_Billboard_matrix_train/song_lengths.npy"
 
     for i in range(len(idx_to_song)):
         file = '/home/c/CS230/Project/Data/McGill_Billboard/MIREX_style/{}/majmin.lab'.format(idx_to_song[i])
-        pred_array = preds_to_array(pred_filename, index2chord_validation, i)
-        chord_array = chords_to_array(chord_filename, index2chord_train, i)
+        pred_array = preds_to_array(pred_filename, index2chord, i)
+        chord_array = chords_to_array(chord_filename, index2chord, i)
 
         length = npy_file(song_lengths_filename)[i]
 
