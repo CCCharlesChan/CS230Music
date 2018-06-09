@@ -70,35 +70,27 @@ class RnnGan(object):
     #self.g_sample = self.generator()
     #self.d_logit_fake = self.discriminator(self.g_sample)
 
-    # Append extra class to the end of the predicted output to indicate
-    # or not the input data was real.
-    self.d_logit_real = tf.concat(
-        [self.d_logit_real,
-         tf.ones(shape=[self.flags.minibatch_size, 15122, 1])], axis=2)
-    print("self.d_logit_real.shape:", self.d_logit_real.shape)
-    #self.d_logit_fake = tf.concat(
-    #    [self.d_logit_fake, tf.zeros(shape=[890, 15122, 1])], axis=2)
-
     # Remove timeline from chord labels. np.delete returns new array.
-    self.labels = np.delete(self.chord, 0, axis=2)
+    self.Y_placeholder = tf.placeholder(
+        self.chord.dtype, shape=(None, 15122, 1), name="Y_placeholder")
     #print("self.labels.shape:", self.labels.shape)
 
     # Convert labels to one-hot vector.
-    self.labels_one_hot = tf.squeeze(tf.one_hot(
-        indices=self.labels, depth=self.LABEL_ONE_HOT_SIZE))
+    self.Y_placeholder = tf.squeeze(tf.one_hot(
+        indices=self.Y_placeholder, depth=self.LABEL_ONE_HOT_SIZE))
     #print("self.labels_one_hot.shape:", self.labels_one_hot.shape)
 
     # Then, append last class, all one's for real data.
-    self.labels_one_hot_real = tf.concat([
-        self.labels_one_hot,
-        tf.ones(shape=[self.flags.minibatch_size, 15122, 1])], axis=2)
-    print("self.labels_one_hot_real.shape:", self.labels_one_hot_real.shape)
+    self.Y_placeholder = tf.concat([
+        self.Y_placeholder,
+        tf.ones(shape=[tf.shape(self.Y_placeholder)[0], 15122, 1])], axis=2)
+    print("self.Y_placeholder.shape:", self.Y_placeholder.shape)
 
     # Discriminator loss.
     self.d_loss_real = tf.reduce_mean(
         tf.nn.softmax_cross_entropy_with_logits_v2(
             logits=self.d_logit_real,
-            labels=self.labels_one_hot_real))
+            labels=self.Y_placeholder))
     #self.d_loss_fake = tf.reduce_mean(
     #    tf.nn.sigmoid_cross_entropy_with_logits(
     #        logits=self.d_logit_fake,
@@ -139,9 +131,14 @@ class RnnGan(object):
       # TODO: make this work with generator.
       while True:
         try:
-          _, _, loss_val = self.sess.run(
-              [d_optimizer, self.d_loss, next_element],
-              feed_dict={self.X_placeholder: self.chroma})
+          chroma, chord, sequence_lengths = self.sess.run(next_element)
+          _, loss_val = self.sess.run(
+              [d_optimizer, self.d_loss],
+              feed_dict={
+                  self.X_placeholder: chroma,
+                  self.Y_placeholder: chord,
+                  self.seq_len_placeholder: sequence_lengths,
+              })
         except tf.errors.OutOfRangeError:
           break
 
@@ -172,9 +169,12 @@ class RnnGan(object):
     # Input data X of shape [m, frame, chroma vector]. Zero-padded.
     # Output should be [m, frame, prediction] where prediction is size 1.
     self.X_placeholder = tf.placeholder(
-        tf.float32, shape=(None, 15122, 25), name="discriminator_X")
+        tf.float32, shape=(None, 15122, 24), name="discriminator_X")
     self.seq_len_placeholder = tf.placeholder(
-        tf.float32, shape=(self.flags.minibatch_size), name="seq_len")
+        self.sequence_lengths.dtype,
+        shape=(None,),
+        name="seq_len_placeholder"
+    )
     #Y = tf.placeholder(
     #    tf.float32, shape=(890, 15122, self.DISCRIMINATOR_OUTPUT_NUM_CLASSES))
 
@@ -224,7 +224,7 @@ class RnnGan(object):
 
     # Add fully connected layer as input to softmax later.
     logits = tf.contrib.layers.fully_connected(
-        outputs, self.LABEL_ONE_HOT_SIZE, activation_fn=None)
+        outputs, self.DISCRIMINATOR_OUTPUT_NUM_CLASSES, activation_fn=None)
     if not self.flags.is_train:
       self.d_logits = logits
     print("logits.shape:", logits.shape)
