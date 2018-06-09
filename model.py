@@ -116,22 +116,22 @@ class RnnGan(object):
     self.model_saver = tf.train.Saver()
     self.sess.run(tf.global_variables_initializer())
 
-    # Initialize batches.
-    self.sess.run(self.iterator.initializer,
-        feed_dict={
-            self.chroma_input_placeholder: self.chroma,
-            self.chord_input_placeholder: self.chord,
-            self.sequence_lengths_input_placeholder: self.sequence_lengths,
-        }
-    )
-    
     next_element = self.iterator.get_next()
 
     for epoch in xrange(1, config.num_epoch+1):
-      # TODO: make this work with generator.
+      # Initialize batches.
+      self.sess.run(self.iterator.initializer,
+          feed_dict={
+              self.chroma_input_placeholder: self.chroma,
+              self.chord_input_placeholder: self.chord,
+              self.sequence_lengths_input_placeholder: self.sequence_lengths,
+          }
+      )
       while True:
         try:
           chroma, chord, sequence_lengths = self.sess.run(next_element)
+          #print("chroma.shape, chord.shape, sequence_lengths.shape:")
+          #print(chroma.shape, chord.shape, sequence_lengths.shape)
           _, loss_val = self.sess.run(
               [d_optimizer, self.d_loss],
               feed_dict={
