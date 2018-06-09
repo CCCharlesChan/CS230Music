@@ -42,10 +42,10 @@ def compare_mirexes(filename1, filename2):
 
     return overlap
 
-def overlap_ratio(a, b):
-    scale = 1/len(a)
+def overlap_ratio(a, b, length):
+    scale = 1/length
     correct = 0
-    for i, j in zip(a, b):
+    for i, j in zip(a, b)[:length]:
         if i == j:
             correct += 1
     return scale * correct
@@ -124,10 +124,14 @@ if __name__ == '__main__':
     index2chord_validation = "/home/ubuntu/McGill_Billboard_validation_matrix_train/index2chord.npy"
     index2chord_train = "/home/ubuntu/Data/McGill_Billboard_test/index2chord.npy"
     chord_filename = "/home/ubuntu/McGill_Billboard_validation_matrix_train/chord.npy"
+    song_lengths_filename = "/home/ubuntu/McGill_Billboard_validation_matrix_train/song_lengths.npy"
 
     for i in range(len(idx_to_song)):
         file = '/home/c/CS230/Project/Data/McGill_Billboard/MIREX_style/{}/majmin.lab'.format(idx_to_song[i])
         pred_array = preds_to_array(pred_filename, index2chord_validation, i)
         chord_array = chords_to_array(chord_filename, index2chord_train, i)
 
-        print(overlap_ratio(chord_array, pred_array))
+        length = npy_file(song_lengths_filename)[i]
+
+
+        print(overlap_ratio(chord_array, pred_array, length))
