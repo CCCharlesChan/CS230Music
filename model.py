@@ -48,6 +48,7 @@ class RnnGan(object):
     self.num_songs = self.chroma.shape[0]
 
     # Batching data.
+    """
     self.chroma_input_placeholder = tf.placeholder(chroma.dtype, chroma.shape)
     self.chord_input_placeholder = tf.placeholder(chord.dtype, chord.shape)
     self.sequence_lengths_input_placeholder = tf.placeholder(
@@ -58,6 +59,7 @@ class RnnGan(object):
         self.sequence_lengths_input_placeholder))
     self.dataset = self.dataset.batch(self.flags.minibatch_size)
     self.iterator = self.dataset.make_initializable_iterator()
+    """
 
     # Initialize tensorboard filewriter (saves summary data for visualization).
     if not self.tensorboard_log_dir:
@@ -70,6 +72,7 @@ class RnnGan(object):
     #self.g_sample = self.generator()
     #self.d_logit_fake = self.discriminator(self.g_sample)
 
+    """
     # Remove timeline from chord labels. np.delete returns new array.
     self.Y_placeholder = tf.placeholder(
         self.chord.dtype, shape=(None, 15122, 1), name="Y_placeholder")
@@ -86,11 +89,19 @@ class RnnGan(object):
         tf.ones(shape=[tf.shape(self.Y_placeholder)[0], 15122, 1])], axis=2)
     print("self.Y_placeholder.shape:", self.Y_placeholder.shape)
 
+    self.Y_placeholder_noprop = tf.stop_gradient(self.Y_placeholder)
+    """
+    self.labels = tf.squeeze(tf.one_hot(
+        indices=self.chord, depth=self.LABEL_ONE_HOT_SIZE))
+    self.labels = tf.concat([
+        self.labels,
+        tf.ones(shape=[self.labels.shape[0], 15122, 1])], axis=2)
+
     # Discriminator loss.
     self.d_loss_real = tf.reduce_mean(
         tf.nn.softmax_cross_entropy_with_logits_v2(
             logits=self.d_logit_real,
-            labels=self.Y_placeholder))
+            labels=self.labels))
     #self.d_loss_fake = tf.reduce_mean(
     #    tf.nn.sigmoid_cross_entropy_with_logits(
     #        logits=self.d_logit_fake,
@@ -116,28 +127,28 @@ class RnnGan(object):
     self.model_saver = tf.train.Saver()
     self.sess.run(tf.global_variables_initializer())
 
-    next_element = self.iterator.get_next()
+    #next_element = self.iterator.get_next()
 
     for epoch in xrange(1, config.num_epoch+1):
       # Initialize batches.
-      self.sess.run(self.iterator.initializer,
-          feed_dict={
-              self.chroma_input_placeholder: self.chroma,
-              self.chord_input_placeholder: self.chord,
-              self.sequence_lengths_input_placeholder: self.sequence_lengths,
-          }
-      )
+      # self.sess.run(self.iterator.initializer,
+      #     feed_dict={
+      #         self.chroma_input_placeholder: self.chroma,
+      #         self.chord_input_placeholder: self.chord,
+      #         self.sequence_lengths_input_placeholder: self.sequence_lengths,
+      #     }
+      # )
       while True:
         try:
-          chroma, chord, sequence_lengths = self.sess.run(next_element)
+          #chroma, chord, sequence_lengths = self.sess.run(next_element)
           #print("chroma.shape, chord.shape, sequence_lengths.shape:")
           #print(chroma.shape, chord.shape, sequence_lengths.shape)
           _, loss_val = self.sess.run(
               [d_optimizer, self.d_loss],
               feed_dict={
-                  self.X_placeholder: chroma,
-                  self.Y_placeholder: chord,
-                  self.seq_len_placeholder: sequence_lengths,
+                  self.X_placeholder: self.chroma,
+                  #self.Y_placeholder: chord,
+                  #self.seq_len_placeholder: sequence_lengths,
               })
         except tf.errors.OutOfRangeError:
           break
@@ -170,15 +181,18 @@ class RnnGan(object):
     # Output should be [m, frame, prediction] where prediction is size 1.
     self.X_placeholder = tf.placeholder(
         tf.float32, shape=(None, 15122, 24), name="discriminator_X")
+    """
     self.seq_len_placeholder = tf.placeholder(
         self.sequence_lengths.dtype,
         shape=(None,),
         name="seq_len_placeholder"
     )
+    """
     #Y = tf.placeholder(
     #    tf.float32, shape=(890, 15122, self.DISCRIMINATOR_OUTPUT_NUM_CLASSES))
 
-    with tf.variable_scope("discriminator_lstm_fw", reuse=tf.AUTO_REUSE):
+    with tf.variable_scope("discriminator_lstm_fw", reuse=tf.AUTO_REUSE,
+        initializer=tf.contrib.layers.xavier_initializer(uniform=False)):
         # 2-layer LSTM, each cell has num_hidden_units hidden units.
         rnn_cell_fw = tf.contrib.rnn.MultiRNNCell([
             tf.contrib.rnn.LSTMCell(
@@ -189,7 +203,8 @@ class RnnGan(object):
                 num_proj=self.DISCRIMINATOR_OUTPUT_NUM_CLASSES),
         ])
 
-    with tf.variable_scope("discriminator_lstm_bw", reuse=tf.AUTO_REUSE):
+    with tf.variable_scope("discriminator_lstm_bw", reuse=tf.AUTO_REUSE,
+        initializer=tf.contrib.layers.xavier_initializer(uniform=False)):
         # backwards LSTM. We want bi-directional for chord estimation.
         rnn_cell_bw = tf.contrib.rnn.MultiRNNCell([
             tf.contrib.rnn.LSTMCell(
@@ -200,11 +215,12 @@ class RnnGan(object):
                 num_proj=self.DISCRIMINATOR_OUTPUT_NUM_CLASSES),
         ])
     
-    # TODO: dropout, minibatch...
+    # TODO: dropout
     
     # Input shape is (batch_size, n_time_steps, n_input), 
     # Output shape is (batch_size, n_time_steps, n_output).
-    with tf.variable_scope("discriminator_bidi_lstm", reuse=tf.AUTO_REUSE):
+    with tf.variable_scope("discriminator_bidi_lstm", reuse=tf.AUTO_REUSE,
+        initializer=tf.contrib.layers.xavier_initializer(uniform=False)):
       (output_fw, output_bw), state = tf.nn.bidirectional_dynamic_rnn(
           cell_fw=rnn_cell_fw,
           cell_bw=rnn_cell_bw,
@@ -212,7 +228,7 @@ class RnnGan(object):
           # sequence_length s where to stop in a single training example.
           # Since we zero-pad inputs, we should stop early based on actual song
           # length to save computation cost.
-          sequence_length=self.seq_len_placeholder,
+          sequence_length=self.sequence_lengths, #self.seq_len_placeholder,
           inputs=self.X_placeholder)
 
     #print("output_fw.shape:", output_fw.shape)
