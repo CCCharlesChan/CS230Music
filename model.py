@@ -48,7 +48,6 @@ class RnnGan(object):
     self.num_songs = self.chroma.shape[0]
 
     # Batching data.
-    """
     self.chroma_input_placeholder = tf.placeholder(chroma.dtype, chroma.shape)
     self.chord_input_placeholder = tf.placeholder(chord.dtype, chord.shape)
     self.sequence_lengths_input_placeholder = tf.placeholder(
@@ -59,7 +58,6 @@ class RnnGan(object):
         self.sequence_lengths_input_placeholder))
     self.dataset = self.dataset.batch(self.flags.minibatch_size)
     self.iterator = self.dataset.make_initializable_iterator()
-    """
 
     # Initialize tensorboard filewriter (saves summary data for visualization).
     if not self.tensorboard_log_dir:
@@ -72,16 +70,13 @@ class RnnGan(object):
     #self.g_sample = self.generator()
     #self.d_logit_fake = self.discriminator(self.g_sample)
 
-    """
     # Remove timeline from chord labels. np.delete returns new array.
     self.Y_placeholder = tf.placeholder(
         self.chord.dtype, shape=(None, 15122, 1), name="Y_placeholder")
-    #print("self.labels.shape:", self.labels.shape)
 
     # Convert labels to one-hot vector.
     self.Y_placeholder = tf.squeeze(tf.one_hot(
         indices=self.Y_placeholder, depth=self.LABEL_ONE_HOT_SIZE))
-    #print("self.labels_one_hot.shape:", self.labels_one_hot.shape)
 
     # Then, append last class, all one's for real data.
     self.Y_placeholder = tf.concat([
@@ -90,13 +85,7 @@ class RnnGan(object):
     print("self.Y_placeholder.shape:", self.Y_placeholder.shape)
 
     self.Y_placeholder_noprop = tf.stop_gradient(self.Y_placeholder)
-    """
-    self.labels = tf.squeeze(tf.one_hot(
-        indices=self.chord, depth=self.LABEL_ONE_HOT_SIZE))
-    self.labels = tf.concat([
-        self.labels,
-        tf.ones(shape=[self.labels.shape[0], 15122, 1])], axis=2)
-
+    
     # Discriminator loss.
     self.d_loss_real = tf.reduce_mean(
         tf.nn.softmax_cross_entropy_with_logits_v2(
@@ -122,33 +111,29 @@ class RnnGan(object):
     #    config.learning_rate, beta1=config.beta1).minimize(
     #        self.g_loss) # TODO: only train G vars, i.e. var_list=self.theta_g)
 
-    #tf.global_variables_initializer()
-
     self.model_saver = tf.train.Saver()
     self.sess.run(tf.global_variables_initializer())
 
-    #next_element = self.iterator.get_next()
+    next_element = self.iterator.get_next()
 
     for epoch in xrange(1, config.num_epoch+1):
       # Initialize batches.
-      # self.sess.run(self.iterator.initializer,
-      #     feed_dict={
-      #         self.chroma_input_placeholder: self.chroma,
-      #         self.chord_input_placeholder: self.chord,
-      #         self.sequence_lengths_input_placeholder: self.sequence_lengths,
-      #     }
-      # )
+      self.sess.run(self.iterator.initializer,
+          feed_dict={
+              self.chroma_input_placeholder: self.chroma,
+              self.chord_input_placeholder: self.chord,
+              self.sequence_lengths_input_placeholder: self.sequence_lengths,
+          }
+      )
       while True:
         try:
-          #chroma, chord, sequence_lengths = self.sess.run(next_element)
-          #print("chroma.shape, chord.shape, sequence_lengths.shape:")
-          #print(chroma.shape, chord.shape, sequence_lengths.shape)
+          chroma, chord, sequence_lengths = self.sess.run(next_element)
           _, loss_val = self.sess.run(
               [d_optimizer, self.d_loss],
               feed_dict={
-                  self.X_placeholder: self.chroma,
-                  #self.Y_placeholder: chord,
-                  #self.seq_len_placeholder: sequence_lengths,
+                  self.X_placeholder: chroma,
+                  self.Y_placeholder: chord,
+                  self.seq_len_placeholder: sequence_lengths,
               })
         except tf.errors.OutOfRangeError:
           break
@@ -181,15 +166,11 @@ class RnnGan(object):
     # Output should be [m, frame, prediction] where prediction is size 1.
     self.X_placeholder = tf.placeholder(
         tf.float32, shape=(None, 15122, 24), name="discriminator_X")
-    """
     self.seq_len_placeholder = tf.placeholder(
         self.sequence_lengths.dtype,
         shape=(None,),
         name="seq_len_placeholder"
     )
-    """
-    #Y = tf.placeholder(
-    #    tf.float32, shape=(890, 15122, self.DISCRIMINATOR_OUTPUT_NUM_CLASSES))
 
     with tf.variable_scope("discriminator_lstm_fw", reuse=tf.AUTO_REUSE,
         initializer=tf.contrib.layers.xavier_initializer(uniform=False)):
@@ -228,11 +209,8 @@ class RnnGan(object):
           # sequence_length s where to stop in a single training example.
           # Since we zero-pad inputs, we should stop early based on actual song
           # length to save computation cost.
-          sequence_length=self.sequence_lengths, #self.seq_len_placeholder,
+          sequence_length=self.seq_len_placeholder,
           inputs=self.X_placeholder)
-
-    #print("output_fw.shape:", output_fw.shape)
-    #print("output_bw.shape:", output_bw.shape)
 
     # Concatenate forward and backward outputs.
     outputs = tf.concat([output_fw, output_bw], axis=2)
@@ -248,8 +226,6 @@ class RnnGan(object):
     return logits
 
   def load(self, sess, model_load_dir, model_load_meta_path, output_path):
-    #tf.saved_model.loader.load(
-    #    self.sess, [tag_constants.SERVING], model_load_dir)
     self.model_saver = tf.train.import_meta_graph(model_load_meta_path)
     self.model_saver.restore(sess,tf.train.latest_checkpoint(model_load_dir))
     print("Loaded model from %s, with meta file %s" % (
@@ -268,6 +244,3 @@ class RnnGan(object):
     np.save(os.path.join(output_path, "probabilities.npy"), probs)
     np.save(os.path.join(output_path, "predictions.npy"), preds)
     print("Saved predictions.npy and probabilities.npy to '%s'" % output_path)
-
-    #print("************* probs[3][0:10]:\n", probs[3][0:10])
-    #print("************* preds[3][0:10]:\n", preds[3][0:10])

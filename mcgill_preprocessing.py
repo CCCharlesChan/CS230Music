@@ -130,13 +130,6 @@ def mcgill_preprocess(sample_range=1301,
     chord = np.zeros((0, max_frame_num, 2))
   
   true_samples = 0
-  # for sample_num in range(sample_range):
-  #   chroma_dir = os.path.join(
-  #       working_dir, chroma_base,'{:0>4}'.format(sample_num))
-  #   chord_dir = os.path.join(
-  #       working_dir, chord_base,'{:0>4}'.format(sample_num))
-  #   if not (os.path.isdir(chroma_dir) and os.path.isdir(chord_dir)):
-  #       continue
 
   for sample_str in get_set(data_set_type):
     chroma_dir = os.path.join(working_dir, chroma_base, sample_str)
@@ -218,9 +211,6 @@ def preprocess_data_and_store(
   TODO(elizachu): stop hard-coding the directory paths. Use optparse.
   """
 
-  # TODO(elizachu): open a file and write periodically in this function, instead
-  # of waiting for all songs to be processed then saving them. If program is
-  # interrupted, we risk saving corrupted data.
   chroma, chord, chord2index, index2chord, song_num = mcgill_preprocess(
       working_dir=input_dir,
       output_list=output_list,

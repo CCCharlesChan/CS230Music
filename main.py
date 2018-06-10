@@ -56,15 +56,12 @@ def main(_):
       model_dir = os.path.join(os.getcwd(), model_dir_name)
       FLAGS.model_save_dir = model_dir
 
-  # TODO(elizachu): figure out better way to store/load preprocessed data.
   chroma = np.delete(np.load(
       os.path.join(FLAGS.input_data_dir, "chroma.npy")).astype(np.float32),
-      0,
-      axis=2)
+      0, axis=2)
   chord = np.delete(
       np.load(os.path.join(FLAGS.input_data_dir, "chord.npy")).astype(np.int32),
-      0,
-      axis=2)
+      0, axis=2)
   chord2index = np.load(
       os.path.join(FLAGS.input_data_dir, "chord2index.npy")).item()
   index2chord = np.load(
